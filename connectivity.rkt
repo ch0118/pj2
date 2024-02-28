@@ -62,8 +62,11 @@
   (define pieces (string-split l))
   (match pieces
     [`("NODE" ,n)
-     'todo]
-    [_ 'todo]))
+     (list 'node n)]
+    [`("LINK" ,n1 ,n2)
+      (list 'link n1 n2)]
+    [else
+      (error "Invalid input format")]))
 
 ;; starter code
 ;; read a file by mapping over its lines  
@@ -82,7 +85,18 @@
 (define/contract (build-init-graph input)
   (-> input-format? graph?)
   ;; TODO TODO TODO 
-  (hash))
+  (define (process-commands commands graph)
+    (if (null? commands)
+        (let ((command (car commands)))
+          (match command
+            [(list 'node n)
+             (process-commands (cdr commands)
+                               (hash-update graph n (lambda (s) (if s (set-add s n) (set n))))]
+            [(list 'link n1 n2)
+             (process-commands (cdr commands)
+                               (hash-update graph n1 (lambda (s) (if s (set-add s n2) (set n2)))))]
+            [else (error "Unknown command type")]))))
+  (process-commands input (hash)))
 
 ;; TODO
 ;; Check whether or not there is a forward line from n0 to n1 in
@@ -92,7 +106,10 @@
 (define (forward-link? graph n0 n1)
   ;; first, look up the set of nodes which are adjacent to (i.e., neighbors of) n0
   ;; then, check if n1 is a member of that set
-  'todo)
+  (let ((neighbors (hash-ref graph n0 #f)))
+    (if neighbors
+        (set-member? neighbors n1)
+        #f)))
 
 ;; TODO
 ;; Add a directed link (from,to) to the graph graph, return the new graph with 
@@ -100,7 +117,9 @@
 ;;
 ;; Hint: use hash-set, hash-ref, and set-add.
 (define (add-link graph from to)
-  'todo)
+  (let ((current-neighbors (hash-ref graph from (set))))
+    (let ((updated-neighbors (set-add current-neighbors to)))
+      (hash-set graph from updated-neighbors))))
 
 ;; TODO
 ;; Perform the transitive closure of the graph. This is the most challenging 
@@ -115,8 +134,17 @@
 ;; `add-link`. It is always possible to use a recursive helper function instead
 ;; of a foldl, but it makes the code much easier to understand in my opinion.
 (define (transitive-closure graph)
-  'todo)
-
+  (define (process-node node graph)
+    (let ((neighbors (hash-ref graph node (set))))
+      (foldl (lambda (neighbor acc-graph)
+        (let ((second-level-neighbors (hash-ref acc-graph neighbor (set))))
+          (foldl (lambda (second-level-neighbor acc-graph-inner)
+                         (add-link acc-graph-inner node second-level-neighbor))
+                 acc-graph
+                 (set->list second-level-neighbors))))
+             graph
+             (set->list neighbors))))
+  (foldl process-node graph (hash-keys graph)))
 
 ;;
 ;; END PROJECT CODE, DO NOT TOUCH BELOW
